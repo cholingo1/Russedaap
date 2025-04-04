@@ -77,7 +77,6 @@
                 (decodedText) => {
                     if (!isScanning) {
                         isScanning = true;
-                        playSound();
                         searchVISID(decodedText);
                         setTimeout(() => { isScanning = false; }, 5000);
                     }
@@ -103,6 +102,7 @@
                     }
                 }
                 if (!found) resultText.innerHTML = "<span style='color: red;'>✖ VISID ikke funnet!</span>";
+                playSound();
             }).catch(error => console.error("Database error:", error));
         }
         
@@ -110,12 +110,15 @@
             if (!foundKey) return;
             database.ref(`/${foundKey}`).once('value').then(snapshot => {
                 const userData = snapshot.val();
+                playSound();
                 if (userData.Status) {
+                    playSound();
                     document.getElementById("resultText").innerHTML += "<br><span style='color: red;'>❌ ID allerede registrert!</span>";
                     document.getElementById("rødBoks").style.display = "block";
                     setTimeout(() => document.getElementById("rødBoks").style.display = "none", 1000);
                 } else {
                     database.ref(`/${foundKey}`).update({ Status: true }).then(() => {
+                        playSound();
                         document.getElementById("resultText").innerHTML += "<br><span style='color: green;'>✔ Registrering fullført!</span>";
                         document.getElementById("grønnBoks").style.display = "block";
                         setTimeout(() => document.getElementById("grønnBoks").style.display = "none", 1000);
