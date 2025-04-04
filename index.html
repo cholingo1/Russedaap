@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        body {
+            font-size: 23px;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        #reader {
+            width: 100%;
+            border-radius: 15px;
+        }
+        
+        #searchResult {
+            text-align: center;
+        }
+        
+        #grønnBoks, #rødBoks {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: none;
+            z-index: 9999;
+        }
+        
+        #grønnBoks { background-color: green; }
+        #rødBoks { background-color: red; }
+    </style>
+    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase QR Scanner</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+    <audio id="scanSound" src="scan.mp3" preload="auto"></audio>
+    <div id="reader"></div>
+    <div id="grønnBoks"></div>
+    <div id="rødBoks"></div>
+    <div id="searchResult">
+        <p id="resultText">Skann en Strekkode for å sjekke Elev Id.</p>
+    </div>
+    
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDtx...",
+            authDomain: "test-b24b1.firebaseapp.com",
+            databaseURL: "https://test-b24b1-default-rtdb.firebaseio.com",
+            projectId: "test-b24b1",
+            storageBucket: "test-b24b1.firebasestorage.app",
+            messagingSenderId: "1058078158269",
+            appId: "1:1058078158269:web:10ac5b50c413295e3636d4"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        let isScanning = false;
+        
+        function playSound() {
+            const sound = document.getElementById("scanSound");
+            sound.currentTime = 0;
+            sound.play();
+        }
+        
+        function startQRScanner() {
+            const html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 700, height: 300 } },
+                (decodedText) => {
+                    if (!isScanning) {
+                        isScanning = true;
+                        playSound();
+                        searchVISID(decodedText);
+                        setTimeout(() => { isScanning = false; }, 5000);
+                    }
+                },
+                (errorMessage) => {
+                    console.warn("QR scanning error:", errorMessage);
+                }
+            );
+        }
+        
+        function searchVISID(visid) {
+            const resultText = document.getElementById("resultText");
+            database.ref('/').once('value').then(snapshot => {
+                const data = snapshot.val();
+                let found = false;
+                for (const key in data) {
+                    if (data[key].VISID == visid) {
+                        found = true;
+                        resultText.innerHTML = `<strong>Fornavn:</strong> ${data[key].Fornavn} <br>
+                                               <strong>Etternavn:</strong> ${data[key].Etternavn} <br>
+                                               <strong>Elev Id:</strong> ${data[key].VISID} <br>`;
+                        confirmScan(key);
+                    }
+                }
+                if (!found) resultText.innerHTML = "<span style='color: red;'>✖ VISID ikke funnet!</span>";
+            }).catch(error => console.error("Database error:", error));
+        }
+        
+        function confirmScan(foundKey) {
+            if (!foundKey) return;
+            database.ref(`/${foundKey}`).once('value').then(snapshot => {
+                const userData = snapshot.val();
+                if (userData.Status) {
+                    document.getElementById("resultText").innerHTML += "<br><span style='color: red;'>❌ ID allerede registrert!</span>";
+                    document.getElementById("rødBoks").style.display = "block";
+                    setTimeout(() => document.getElementById("rødBoks").style.display = "none", 1000);
+                } else {
+                    database.ref(`/${foundKey}`).update({ Status: true }).then(() => {
+                        document.getElementById("resultText").innerHTML += "<br><span style='color: green;'>✔ Registrering fullført!</span>";
+                        document.getElementById("grønnBoks").style.display = "block";
+                        setTimeout(() => document.getElementById("grønnBoks").style.display = "none", 1000);
+                    });
+                }
+            });
+        }
+        
+        window.onload = startQRScanner;
+    </script>
+</body>
+</html>
